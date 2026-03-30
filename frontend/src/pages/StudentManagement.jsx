@@ -121,7 +121,7 @@ const StudentManagement = () => {
     { title: "Tên Học sinh", dataIndex: "full_name", key: "full_name" },
     { title: "Phụ huynh", dataIndex: "parent_name", key: "parent_name" },
     { title: "SĐT", dataIndex: "phone", key: "phone" },
-    { title: "Trạng thái", dataIndex: "status", key: "status" },
+    { title: "Trạng thái", dataIndex: "status", key: "status", render: (v) => v === "Studying" ? <Tag color="green">Đang học</Tag> : v === "Reserved" ? <Tag color="orange">Bảo lưu</Tag> : v === "Dropped" ? <Tag color="red">Đã nghỉ</Tag> : v },
     {
       title: "Hành động",
       key: "action",
@@ -217,9 +217,9 @@ const StudentManagement = () => {
             <Select
               size="large"
               options={[
-                { label: "Studying", value: "Studying" },
-                { label: "Reserved", value: "Reserved" },
-                { label: "Dropped", value: "Dropped" },
+                { label: "Đang học", value: "Studying" },
+                { label: "Bảo lưu", value: "Reserved" },
+                { label: "Đã nghỉ", value: "Dropped" },
               ]}
             />
           </Form.Item>

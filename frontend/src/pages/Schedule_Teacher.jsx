@@ -157,9 +157,9 @@ const Schedule_Teacher = () => {
                 }))
               }
               options={[
-                { label: "Present", value: "Present" },
-                { label: "Absent", value: "Absent" },
-                { label: "Late", value: "Late" },
+                { label: "Có mặt", value: "Present" },
+                { label: "Vắng", value: "Absent" },
+                { label: "Đi trễ", value: "Late" },
               ]}
               style={{ width: 140 }}
             />
@@ -219,9 +219,9 @@ const Schedule_Teacher = () => {
     ];
   }, [attendanceMap]);
 
-  const openAttendance = async (clazz) => {
+  const openAttendance = async (clazz, dateObj) => {
     setSelectedClass(clazz);
-    setSelectedDate(moment());
+    setSelectedDate(moment(dateObj));
     setAttendanceMap({});
     setAttendanceOpen(true);
   };
@@ -315,7 +315,7 @@ const Schedule_Teacher = () => {
         style={{ height: "100%", marginTop: "20px" }}
         onSelectEvent={(evt) => {
           if (user?.role === "Teacher") {
-            openAttendance(evt.resource);
+            openAttendance(evt.resource, evt.start);
           }
         }}
       />

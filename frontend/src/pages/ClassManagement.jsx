@@ -1,4 +1,5 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useContext } from "react";
+import { AuthContext } from "../context/AuthContext";
 import {
   Table,
   Button,
@@ -10,7 +11,9 @@ import {
   Popconfirm,
   Select,
   Tag,
+  TimePicker,
 } from "antd";
+import dayjs from "dayjs";
 import {
   PlusOutlined,
   EditOutlined,
@@ -30,6 +33,7 @@ const ClassManagement = () => {
   const [selectedStudentIds, setSelectedStudentIds] = useState([]);
   const [editing, setEditing] = useState(null);
   const [search, setSearch] = useState("");
+  const { user } = useContext(AuthContext);
   const [form] = Form.useForm();
   const [enrollForm] = Form.useForm();
 
@@ -91,20 +95,28 @@ const ClassManagement = () => {
     setEditing(record);
     form.setFieldsValue({
       name: record.name,
-      schedule_rule: record.schedule_rule,
       teacher_id: record.teacher_id?._id || record.teacher_id || undefined,
       status: record.status,
+      days: record.schedule_days || [],
+      timeRange: record.start_time && record.end_time ? [dayjs(record.start_time, "HH:mm"), dayjs(record.end_time, "HH:mm")] : null
     });
     setIsModalVisible(true);
   };
 
   const handleSubmit = async (values) => {
     try {
+      const { days, timeRange, ...rest } = values;
+      let schedule_rule = "";
+      if (days && days.length > 0 && timeRange && timeRange.length === 2) {
+        schedule_rule = `${days.join("-")}, ${timeRange[0].format("HH:mm")}-${timeRange[1].format("HH:mm")}`;
+      }
+      const submitData = { ...rest, schedule_rule };
+
       if (editing) {
-        await axios.put(`/api/classes/${editing._id}`, values);
+        await axios.put(`/api/classes/${editing._id}`, submitData);
         message.success("Cập nhật lớp thành công");
       } else {
-        await axios.post("/api/classes", values);
+        await axios.post("/api/classes", submitData);
         message.success("Thêm lớp thành công");
       }
       setIsModalVisible(false);
@@ -172,8 +184,8 @@ const ClassManagement = () => {
         return <span>{n}</span>;
       },
     },
-    { title: "Trạng thái", dataIndex: "status", key: "status" },
-    {
+    { title: "Trạng thái", dataIndex: "status", key: "status", render: (v) => v === "Open" ? <Tag color="green">Đang mở</Tag> : v === "Closed" ? <Tag color="red">Đã đóng</Tag> : v },
+    ...(user?.role !== "Teacher" ? [{
       title: "Hành động",
       key: "action",
       render: (_, record) => (
@@ -199,7 +211,7 @@ const ClassManagement = () => {
           </Popconfirm>
         </Space>
       ),
-    },
+    }] : []),
   ];
 
   return (
@@ -220,9 +232,11 @@ const ClassManagement = () => {
             onChange={(e) => setSearch(e.target.value)}
             style={{ width: 260 }}
           />
-          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-            Thêm Lớp
-          </Button>
+          {user?.role !== "Teacher" && (
+            <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+              Thêm Lớp
+            </Button>
+          )}
         </Space>
       </div>
 
@@ -262,18 +276,26 @@ const ClassManagement = () => {
               placeholder="Chọn giáo viên"
             />
           </Form.Item>
-          <Form.Item
-            name="schedule_rule"
-            label="Lịch (VD: T2-T4-T6, 18:00-19:30)"
-          >
-            <Input size="large" placeholder="T2-T4-T6, 18:00-19:30" />
+          <Form.Item name="days" label="Các ngày học trong tuần" rules={[{ required: true, message: "Chọn ít nhất 1 ngày" }]}>
+            <Select mode="multiple" placeholder="Chọn ngày" size="large">
+              <Select.Option value="T2">Thứ 2</Select.Option>
+              <Select.Option value="T3">Thứ 3</Select.Option>
+              <Select.Option value="T4">Thứ 4</Select.Option>
+              <Select.Option value="T5">Thứ 5</Select.Option>
+              <Select.Option value="T6">Thứ 6</Select.Option>
+              <Select.Option value="T7">Thứ 7</Select.Option>
+              <Select.Option value="CN">Chủ Nhật</Select.Option>
+            </Select>
+          </Form.Item>
+          <Form.Item name="timeRange" label="Khung giờ học" rules={[{ required: true, message: "Chọn khung giờ" }]}>
+            <TimePicker.RangePicker format="HH:mm" size="large" style={{ width: "100%" }} />
           </Form.Item>
           <Form.Item name="status" label="Trạng thái" initialValue="Open">
             <Select
               size="large"
               options={[
-                { label: "Open", value: "Open" },
-                { label: "Closed", value: "Closed" },
+                { label: "Đang mở", value: "Open" },
+                { label: "Đã đóng", value: "Closed" },
               ]}
             />
           </Form.Item>

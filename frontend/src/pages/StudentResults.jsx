@@ -55,7 +55,8 @@ const StudentResults = () => {
       render: (v) => {
         const color =
           v === "Present" ? "green" : v === "Late" ? "orange" : "red";
-        return <Tag color={color}>{v}</Tag>;
+        const label = v === "Present" ? "Có mặt" : v === "Late" ? "Đi trễ" : v === "Absent" ? "Vắng" : v;
+        return <Tag color={color}>{label}</Tag>;
       },
     },
     {
