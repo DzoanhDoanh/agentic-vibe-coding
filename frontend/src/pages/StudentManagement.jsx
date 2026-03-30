@@ -1,21 +1,36 @@
-import React, { useState, useEffect } from 'react';
-import { Table, Button, Modal, Form, Input, message } from 'antd';
-import { PlusOutlined } from '@ant-design/icons';
-import axios from 'axios';
+import React, { useMemo, useState, useEffect } from "react";
+import {
+  Table,
+  Button,
+  Modal,
+  Form,
+  Input,
+  message,
+  Space,
+  Popconfirm,
+  Select,
+} from "antd";
+import { PlusOutlined } from "@ant-design/icons";
+import axios from "axios";
 
 const StudentManagement = () => {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [search, setSearch] = useState("");
+  const [accountModalOpen, setAccountModalOpen] = useState(false);
+  const [accountStudent, setAccountStudent] = useState(null);
   const [form] = Form.useForm();
+  const [accountForm] = Form.useForm();
 
   const fetchStudents = async () => {
     setLoading(true);
     try {
-      const { data } = await axios.get('/api/students');
+      const { data } = await axios.get("/api/students");
       setStudents(data);
     } catch (error) {
-      if(error.response?.status !== 403) message.error('Lỗi tải học sinh');
+      if (error.response?.status !== 403) message.error("Lỗi tải học sinh");
     } finally {
       setLoading(false);
     }
@@ -25,37 +40,238 @@ const StudentManagement = () => {
     fetchStudents();
   }, []);
 
-  const handleAdd = async (values) => {
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return students;
+    return students.filter(
+      (s) =>
+        String(s.full_name || "")
+          .toLowerCase()
+          .includes(q) ||
+        String(s.phone || "")
+          .toLowerCase()
+          .includes(q),
+    );
+  }, [students, search]);
+
+  const handleSubmit = async (values) => {
     try {
-      await axios.post('/api/students', values);
-      message.success('Thêm học sinh thành công');
+      if (editing) {
+        await axios.put(`/api/students/${editing._id}`, values);
+        message.success("Cập nhật học sinh thành công");
+      } else {
+        await axios.post("/api/students", values);
+        message.success("Thêm học sinh thành công");
+      }
       setIsModalVisible(false);
       form.resetFields();
+      setEditing(null);
       fetchStudents();
     } catch (error) {
-      message.error(error.response?.data?.message || 'Có lỗi xảy ra');
+      message.error(error.response?.data?.message || "Có lỗi xảy ra");
+    }
+  };
+
+  const handleEdit = (record) => {
+    setEditing(record);
+    form.setFieldsValue({
+      full_name: record.full_name,
+      parent_name: record.parent_name,
+      phone: record.phone,
+      status: record.status,
+    });
+    setIsModalVisible(true);
+  };
+
+  const handleDelete = async (record) => {
+    try {
+      await axios.delete(`/api/students/${record._id}`);
+      message.success("Đã xóa");
+      fetchStudents();
+    } catch (error) {
+      message.error(error.response?.data?.message || "Lỗi khi xóa");
+    }
+  };
+
+  const openCreateStudentAccount = (student) => {
+    setAccountStudent(student);
+    accountForm.resetFields();
+    setAccountModalOpen(true);
+  };
+
+  const handleCreateStudentAccount = async (values) => {
+    try {
+      await axios.post("/api/users", {
+        email: values.email,
+        password: values.password,
+        full_name: values.full_name,
+        role: "Student",
+        student_id: accountStudent?._id,
+      });
+      message.success("Tạo tài khoản học sinh thành công");
+      setAccountModalOpen(false);
+      setAccountStudent(null);
+      accountForm.resetFields();
+    } catch (error) {
+      message.error(error.response?.data?.message || "Lỗi tạo tài khoản");
     }
   };
 
   const columns = [
-    { title: 'Tên Học sinh', dataIndex: 'full_name', key: 'full_name' },
-    { title: 'Phụ huynh', dataIndex: 'parent_name', key: 'parent_name' },
-    { title: 'SĐT', dataIndex: 'phone', key: 'phone' },
-    { title: 'Trạng thái', dataIndex: 'status', key: 'status' }
+    { title: "Tên Học sinh", dataIndex: "full_name", key: "full_name" },
+    { title: "Phụ huynh", dataIndex: "parent_name", key: "parent_name" },
+    { title: "SĐT", dataIndex: "phone", key: "phone" },
+    { title: "Trạng thái", dataIndex: "status", key: "status" },
+    {
+      title: "Hành động",
+      key: "action",
+      render: (_, record) => (
+        <Space>
+          <Button size="small" onClick={() => handleEdit(record)}>
+            Sửa
+          </Button>
+          <Button size="small" onClick={() => openCreateStudentAccount(record)}>
+            Tạo tài khoản
+          </Button>
+          <Popconfirm
+            title="Xóa học sinh?"
+            onConfirm={() => handleDelete(record)}
+          >
+            <Button size="small" danger>
+              Xóa
+            </Button>
+          </Popconfirm>
+        </Space>
+      ),
+    },
   ];
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          marginBottom: 16,
+        }}
+      >
         <h2>Danh sách Học sinh</h2>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => setIsModalVisible(true)}>Tham gia Học sinh</Button>
+        <Space>
+          <Input.Search
+            placeholder="Tìm theo tên/SĐT"
+            allowClear
+            onSearch={(v) => setSearch(v)}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{ width: 260 }}
+          />
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={() => {
+              setEditing(null);
+              form.resetFields();
+              setIsModalVisible(true);
+            }}
+          >
+            Thêm Học sinh
+          </Button>
+        </Space>
       </div>
-      <Table columns={columns} dataSource={students} rowKey="_id" loading={loading}/>
-      <Modal title="Thêm Bản Ghi Học sinh" open={isModalVisible} onOk={() => form.submit()} onCancel={() => setIsModalVisible(false)} destroyOnClose>
-        <Form form={form} layout="vertical" onFinish={handleAdd}>
-          <Form.Item name="full_name" label="Tên Học Sinh" rules={[{ required: true }]}><Input size="large"/></Form.Item>
-          <Form.Item name="parent_name" label="Tên Phụ Huynh"><Input size="large"/></Form.Item>
-          <Form.Item name="phone" label="Số Điện Thoại"><Input size="large"/></Form.Item>
+
+      <Table
+        columns={columns}
+        dataSource={filtered}
+        rowKey="_id"
+        loading={loading}
+        pagination={{ pageSize: 10 }}
+      />
+
+      <Modal
+        title={editing ? "Cập nhật Học sinh" : "Thêm Học sinh"}
+        open={isModalVisible}
+        onOk={() => form.submit()}
+        onCancel={() => {
+          setIsModalVisible(false);
+          setEditing(null);
+          form.resetFields();
+        }}
+        destroyOnClose
+        okText="Lưu"
+        cancelText="Hủy"
+      >
+        <Form form={form} layout="vertical" onFinish={handleSubmit}>
+          <Form.Item
+            name="full_name"
+            label="Tên Học Sinh"
+            rules={[{ required: true }]}
+          >
+            <Input size="large" />
+          </Form.Item>
+          <Form.Item name="parent_name" label="Tên Phụ Huynh">
+            <Input size="large" />
+          </Form.Item>
+          <Form.Item name="phone" label="Số Điện Thoại">
+            <Input size="large" />
+          </Form.Item>
+          <Form.Item name="status" label="Trạng thái" initialValue="Studying">
+            <Select
+              size="large"
+              options={[
+                { label: "Studying", value: "Studying" },
+                { label: "Reserved", value: "Reserved" },
+                { label: "Dropped", value: "Dropped" },
+              ]}
+            />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title={
+          accountStudent
+            ? `Tạo tài khoản - ${accountStudent.full_name}`
+            : "Tạo tài khoản học sinh"
+        }
+        open={accountModalOpen}
+        onOk={() => accountForm.submit()}
+        onCancel={() => {
+          setAccountModalOpen(false);
+          setAccountStudent(null);
+          accountForm.resetFields();
+        }}
+        destroyOnClose
+        okText="Tạo"
+        cancelText="Hủy"
+      >
+        <Form
+          form={accountForm}
+          layout="vertical"
+          onFinish={handleCreateStudentAccount}
+        >
+          <Form.Item
+            name="full_name"
+            label="Họ tên hiển thị"
+            rules={[{ required: true, message: "Vui lòng nhập họ tên" }]}
+          >
+            <Input
+              size="large"
+              placeholder={accountStudent?.full_name || "Học sinh"}
+            />
+          </Form.Item>
+          <Form.Item
+            name="email"
+            label="Email"
+            rules={[{ required: true, message: "Vui lòng nhập email" }]}
+          >
+            <Input size="large" placeholder="student@system.com" />
+          </Form.Item>
+          <Form.Item
+            name="password"
+            label="Mật khẩu"
+            rules={[{ required: true, message: "Vui lòng nhập mật khẩu" }]}
+          >
+            <Input.Password size="large" placeholder="******" />
+          </Form.Item>
         </Form>
       </Modal>
     </div>

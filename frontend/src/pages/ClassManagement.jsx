@@ -1,59 +1,317 @@
-import React, { useState, useEffect } from 'react';
-import { Table, Button, Modal, Form, Input, message } from 'antd';
-import { PlusOutlined } from '@ant-design/icons';
-import axios from 'axios';
+import React, { useMemo, useState, useEffect } from "react";
+import {
+  Table,
+  Button,
+  Modal,
+  Form,
+  Input,
+  message,
+  Space,
+  Popconfirm,
+  Select,
+  Tag,
+} from "antd";
+import {
+  PlusOutlined,
+  EditOutlined,
+  DeleteOutlined,
+  UserAddOutlined,
+} from "@ant-design/icons";
+import axios from "axios";
 
 const ClassManagement = () => {
   const [classes, setClasses] = useState([]);
+  const [teachers, setTeachers] = useState([]);
+  const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [enrollModalOpen, setEnrollModalOpen] = useState(false);
+  const [enrollClass, setEnrollClass] = useState(null);
+  const [selectedStudentIds, setSelectedStudentIds] = useState([]);
+  const [editing, setEditing] = useState(null);
+  const [search, setSearch] = useState("");
   const [form] = Form.useForm();
+  const [enrollForm] = Form.useForm();
 
   const fetchClasses = async () => {
     setLoading(true);
     try {
-      const { data } = await axios.get('/api/classes');
+      const { data } = await axios.get("/api/classes");
       setClasses(data);
     } catch (error) {
-      if(error.response?.status !== 403) message.error('Lỗi tải dữ liệu lớp');
+      if (error.response?.status !== 403) message.error("Lỗi tải dữ liệu lớp");
     } finally {
       setLoading(false);
     }
   };
 
+  const fetchTeachers = async () => {
+    try {
+      const { data } = await axios.get("/api/users", {
+        params: { role: "Teacher" },
+      });
+      setTeachers(data);
+    } catch (error) {
+      // ignore
+    }
+  };
+
+  const fetchStudents = async () => {
+    try {
+      const { data } = await axios.get("/api/students");
+      setStudents(data);
+    } catch (error) {
+      // ignore
+    }
+  };
+
   useEffect(() => {
     fetchClasses();
+    fetchTeachers();
+    fetchStudents();
   }, []);
 
-  const handleAdd = async (values) => {
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return classes;
+    return classes.filter((c) =>
+      String(c.name || "")
+        .toLowerCase()
+        .includes(q),
+    );
+  }, [classes, search]);
+
+  const openCreate = () => {
+    setEditing(null);
+    form.resetFields();
+    setIsModalVisible(true);
+  };
+
+  const openEdit = (record) => {
+    setEditing(record);
+    form.setFieldsValue({
+      name: record.name,
+      schedule_rule: record.schedule_rule,
+      teacher_id: record.teacher_id?._id || record.teacher_id || undefined,
+      status: record.status,
+    });
+    setIsModalVisible(true);
+  };
+
+  const handleSubmit = async (values) => {
     try {
-      await axios.post('/api/classes', values);
-      message.success('Thêm lớp thành công');
+      if (editing) {
+        await axios.put(`/api/classes/${editing._id}`, values);
+        message.success("Cập nhật lớp thành công");
+      } else {
+        await axios.post("/api/classes", values);
+        message.success("Thêm lớp thành công");
+      }
       setIsModalVisible(false);
       form.resetFields();
+      setEditing(null);
       fetchClasses();
     } catch (error) {
-      message.error(error.response?.data?.message || 'Lỗi thêm lớp');
+      message.error(error.response?.data?.message || "Lỗi thêm lớp");
+    }
+  };
+
+  const handleDelete = async (record) => {
+    try {
+      await axios.delete(`/api/classes/${record._id}`);
+      message.success("Đã xóa");
+      fetchClasses();
+    } catch (error) {
+      message.error(error.response?.data?.message || "Lỗi khi xóa");
+    }
+  };
+
+  const openEnroll = (record) => {
+    setEnrollClass(record);
+    setSelectedStudentIds([]);
+    enrollForm.resetFields();
+    setEnrollModalOpen(true);
+  };
+
+  const handleEnroll = async () => {
+    if (!enrollClass) return;
+    if (selectedStudentIds.length === 0) {
+      message.warning("Chọn ít nhất 1 học sinh");
+      return;
+    }
+    try {
+      for (const sid of selectedStudentIds) {
+        await axios.post(`/api/classes/${enrollClass._id}/enroll`, {
+          student_id: sid,
+        });
+      }
+      message.success("Ghi danh thành công");
+      setEnrollModalOpen(false);
+      setEnrollClass(null);
+      setSelectedStudentIds([]);
+      fetchClasses();
+    } catch (error) {
+      message.error(error.response?.data?.message || "Lỗi ghi danh");
     }
   };
 
   const columns = [
-    { title: 'Tên Lớp', dataIndex: 'name', key: 'name' },
-    { title: 'Lịch học', dataIndex: 'schedule_rule', key: 'schedule_rule' },
-    { title: 'Trạng thái', dataIndex: 'status', key: 'status' }
+    { title: "Tên Lớp", dataIndex: "name", key: "name" },
+    {
+      title: "Giáo viên",
+      dataIndex: "teacher_id",
+      key: "teacher_id",
+      render: (t) => (t ? t.full_name : <Tag>Chưa phân công</Tag>),
+    },
+    { title: "Lịch học", dataIndex: "schedule_rule", key: "schedule_rule" },
+    {
+      title: "Học sinh",
+      key: "students",
+      render: (_, record) => {
+        const n = (record.enrolled_students || []).length;
+        return <span>{n}</span>;
+      },
+    },
+    { title: "Trạng thái", dataIndex: "status", key: "status" },
+    {
+      title: "Hành động",
+      key: "action",
+      render: (_, record) => (
+        <Space>
+          <Button
+            icon={<UserAddOutlined />}
+            size="small"
+            onClick={() => openEnroll(record)}
+          >
+            Ghi danh
+          </Button>
+          <Button
+            icon={<EditOutlined />}
+            size="small"
+            onClick={() => openEdit(record)}
+          >
+            Sửa
+          </Button>
+          <Popconfirm title="Xóa lớp?" onConfirm={() => handleDelete(record)}>
+            <Button icon={<DeleteOutlined />} danger size="small">
+              Xóa
+            </Button>
+          </Popconfirm>
+        </Space>
+      ),
+    },
   ];
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          marginBottom: 16,
+        }}
+      >
         <h2>Quản lý Lớp học</h2>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => setIsModalVisible(true)}>Thêm Lớp</Button>
+        <Space>
+          <Input.Search
+            placeholder="Tìm theo tên lớp"
+            allowClear
+            onSearch={(v) => setSearch(v)}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{ width: 260 }}
+          />
+          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+            Thêm Lớp
+          </Button>
+        </Space>
       </div>
-      <Table columns={columns} dataSource={classes} rowKey="_id" loading={loading}/>
-      <Modal title="Thêm Lớp" open={isModalVisible} onOk={() => form.submit()} onCancel={() => setIsModalVisible(false)} destroyOnClose>
-        <Form form={form} layout="vertical" onFinish={handleAdd}>
-          <Form.Item name="name" label="Tên lớp" rules={[{ required: true }]}><Input size="large"/></Form.Item>
-          <Form.Item name="schedule_rule" label="Lịch (T2-T4-T6, 18:00)"><Input size="large"/></Form.Item>
+
+      <Table
+        columns={columns}
+        dataSource={filtered}
+        rowKey="_id"
+        loading={loading}
+        pagination={{ pageSize: 10 }}
+      />
+
+      <Modal
+        title={editing ? "Cập nhật Lớp" : "Thêm Lớp"}
+        open={isModalVisible}
+        onOk={() => form.submit()}
+        onCancel={() => {
+          setIsModalVisible(false);
+          setEditing(null);
+          form.resetFields();
+        }}
+        destroyOnClose
+        okText="Lưu"
+        cancelText="Hủy"
+      >
+        <Form form={form} layout="vertical" onFinish={handleSubmit}>
+          <Form.Item name="name" label="Tên lớp" rules={[{ required: true }]}>
+            <Input size="large" />
+          </Form.Item>
+          <Form.Item name="teacher_id" label="Giáo viên (tuỳ chọn)">
+            <Select
+              size="large"
+              allowClear
+              options={teachers.map((t) => ({
+                label: `${t.full_name} (${t.email})`,
+                value: t._id,
+              }))}
+              placeholder="Chọn giáo viên"
+            />
+          </Form.Item>
+          <Form.Item
+            name="schedule_rule"
+            label="Lịch (VD: T2-T4-T6, 18:00-19:30)"
+          >
+            <Input size="large" placeholder="T2-T4-T6, 18:00-19:30" />
+          </Form.Item>
+          <Form.Item name="status" label="Trạng thái" initialValue="Open">
+            <Select
+              size="large"
+              options={[
+                { label: "Open", value: "Open" },
+                { label: "Closed", value: "Closed" },
+              ]}
+            />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title={
+          enrollClass
+            ? `Ghi danh học sinh - ${enrollClass.name}`
+            : "Ghi danh học sinh"
+        }
+        open={enrollModalOpen}
+        onOk={handleEnroll}
+        onCancel={() => {
+          setEnrollModalOpen(false);
+          setEnrollClass(null);
+          setSelectedStudentIds([]);
+          enrollForm.resetFields();
+        }}
+        destroyOnClose
+        okText="Ghi danh"
+        cancelText="Hủy"
+      >
+        <Form form={enrollForm} layout="vertical">
+          <Form.Item label="Chọn học sinh">
+            <Select
+              mode="multiple"
+              value={selectedStudentIds}
+              onChange={setSelectedStudentIds}
+              options={students.map((s) => ({
+                label: `${s.full_name}${s.phone ? ` - ${s.phone}` : ""}`,
+                value: s._id,
+              }))}
+              placeholder="Chọn học sinh"
+              style={{ width: "100%" }}
+            />
+          </Form.Item>
         </Form>
       </Modal>
     </div>
