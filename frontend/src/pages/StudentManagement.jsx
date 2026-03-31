@@ -9,6 +9,7 @@ import {
   Space,
   Popconfirm,
   Select,
+  Tag,
 } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
 import axios from "axios";
@@ -28,7 +29,21 @@ const StudentManagement = () => {
     setLoading(true);
     try {
       const { data } = await axios.get("/api/students");
-      setStudents(data);
+      setStudents((prev) => {
+        const prevById = new Map((prev || []).map((s) => [String(s._id), s]));
+        return (data || []).map((s) => {
+          const prevRow = prevById.get(String(s._id));
+          // If backend hasn't been restarted, it may not include the 'account' field at all.
+          // In that case, keep any locally-known account to avoid showing "Chưa có" again.
+          const mergedAccount = Object.prototype.hasOwnProperty.call(
+            s,
+            "account",
+          )
+            ? s.account
+            : (prevRow?.account ?? null);
+          return { ...s, account: mergedAccount };
+        });
+      });
     } catch (error) {
       if (error.response?.status !== 403) message.error("Lỗi tải học sinh");
     } finally {
@@ -101,17 +116,38 @@ const StudentManagement = () => {
 
   const handleCreateStudentAccount = async (values) => {
     try {
-      await axios.post("/api/users", {
+      const { data } = await axios.post("/api/users", {
         email: values.email,
         password: values.password,
         full_name: values.full_name,
         role: "Student",
         student_id: accountStudent?._id,
       });
+
+      if (data?._id && data?.student_id) {
+        setStudents((prev) =>
+          (prev || []).map((s) =>
+            String(s._id) === String(data.student_id)
+              ? {
+                  ...s,
+                  account: {
+                    _id: data._id,
+                    email: data.email,
+                    full_name: data.full_name,
+                    status: data.status,
+                    student_id: data.student_id,
+                  },
+                }
+              : s,
+          ),
+        );
+      }
+
       message.success("Tạo tài khoản học sinh thành công");
       setAccountModalOpen(false);
       setAccountStudent(null);
       accountForm.resetFields();
+      fetchStudents();
     } catch (error) {
       message.error(error.response?.data?.message || "Lỗi tạo tài khoản");
     }
@@ -121,7 +157,29 @@ const StudentManagement = () => {
     { title: "Tên Học sinh", dataIndex: "full_name", key: "full_name" },
     { title: "Phụ huynh", dataIndex: "parent_name", key: "parent_name" },
     { title: "SĐT", dataIndex: "phone", key: "phone" },
-    { title: "Trạng thái", dataIndex: "status", key: "status", render: (v) => v === "Studying" ? <Tag color="green">Đang học</Tag> : v === "Reserved" ? <Tag color="orange">Bảo lưu</Tag> : v === "Dropped" ? <Tag color="red">Đã nghỉ</Tag> : v },
+    {
+      title: "Tài khoản",
+      key: "account",
+      render: (_, record) => {
+        if (!record.account) return <Tag>Chưa có</Tag>;
+        return <span>{record.account.email}</span>;
+      },
+    },
+    {
+      title: "Trạng thái",
+      dataIndex: "status",
+      key: "status",
+      render: (v) =>
+        v === "Studying" ? (
+          <Tag color="green">Đang học</Tag>
+        ) : v === "Reserved" ? (
+          <Tag color="orange">Bảo lưu</Tag>
+        ) : v === "Dropped" ? (
+          <Tag color="red">Đã nghỉ</Tag>
+        ) : (
+          v
+        ),
+    },
     {
       title: "Hành động",
       key: "action",
@@ -130,8 +188,12 @@ const StudentManagement = () => {
           <Button size="small" onClick={() => handleEdit(record)}>
             Sửa
           </Button>
-          <Button size="small" onClick={() => openCreateStudentAccount(record)}>
-            Tạo tài khoản
+          <Button
+            size="small"
+            disabled={!!record.account}
+            onClick={() => openCreateStudentAccount(record)}
+          >
+            {record.account ? "Đã có tài khoản" : "Tạo tài khoản"}
           </Button>
           <Popconfirm
             title="Xóa học sinh?"

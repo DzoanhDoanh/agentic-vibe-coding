@@ -1,10 +1,32 @@
 const Student = require("../models/Student");
 const Class = require("../models/Class");
+const User = require("../models/User");
 
 const getStudents = async (req, res) => {
   try {
-    const students = await Student.find(req.branchFilter);
-    res.json(students);
+    const students = await Student.find(req.branchFilter).lean();
+    const studentIds = students.map((s) => s._id);
+
+    const accounts = await User.find({
+      role: "Student",
+      student_id: { $in: studentIds },
+    })
+      .select("_id email full_name status student_id")
+      .sort({ createdAt: 1 })
+      .lean();
+
+    const accountByStudentId = new Map();
+    for (const acc of accounts) {
+      const key = String(acc.student_id);
+      if (!accountByStudentId.has(key)) accountByStudentId.set(key, acc);
+    }
+
+    res.json(
+      students.map((s) => ({
+        ...s,
+        account: accountByStudentId.get(String(s._id)) || null,
+      })),
+    );
   } catch (error) {
     res.status(500).json({ message: "Server Error" });
   }

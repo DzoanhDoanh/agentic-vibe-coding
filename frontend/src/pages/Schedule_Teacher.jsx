@@ -1,6 +1,7 @@
 import React, { useContext, useEffect, useMemo, useState } from "react";
 import { Calendar, momentLocalizer } from "react-big-calendar";
 import moment from "moment";
+import "moment/locale/vi";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import {
   DatePicker,
@@ -17,23 +18,49 @@ import {
 import axios from "axios";
 import { AuthContext } from "../context/AuthContext";
 
+moment.locale("vi");
 const localizer = momentLocalizer(moment);
 const Schedule_Teacher = () => {
   const { user } = useContext(AuthContext);
   const [classes, setClasses] = useState([]);
   const [events, setEvents] = useState([]);
+  const [calendarDate, setCalendarDate] = useState(moment());
+  const [calendarView, setCalendarView] = useState("week");
   const [attendanceOpen, setAttendanceOpen] = useState(false);
   const [selectedClass, setSelectedClass] = useState(null);
   const [selectedDate, setSelectedDate] = useState(moment());
   const [attendanceLoading, setAttendanceLoading] = useState(false);
   const [attendanceMap, setAttendanceMap] = useState({});
 
+  const calendarFormats = useMemo(() => {
+    return {
+      monthHeaderFormat: (date, culture) =>
+        `Tháng ${moment(date)
+          .locale(culture || "vi")
+          .format("M YYYY")}`,
+      dayHeaderFormat: (date, culture) =>
+        moment(date)
+          .locale(culture || "vi")
+          .format("dddd, DD/MM/YYYY"),
+      dayRangeHeaderFormat: (range, culture) => {
+        const start = moment(range?.start).locale(culture || "vi");
+        const end = moment(range?.end).locale(culture || "vi");
+        return `${start.format("DD/MM/YYYY")} - ${end.format("DD/MM/YYYY")}`;
+      },
+      agendaHeaderFormat: (range, culture) => {
+        const start = moment(range?.start).locale(culture || "vi");
+        const end = moment(range?.end).locale(culture || "vi");
+        return `Từ ${start.format("DD/MM/YYYY")} đến ${end.format("DD/MM/YYYY")}`;
+      },
+    };
+  }, []);
+
   const parseScheduleRule = (scheduleRule) => {
     if (!scheduleRule) return null;
     const raw = String(scheduleRule).trim();
     if (!raw) return null;
 
-    const dayMatch = raw.match(/(CN|T[2-7])([\s,\-]+(CN|T[2-7]))*/i);
+    const dayMatch = raw.match(/(CN|T[2-7])([\s,-]+(CN|T[2-7]))*/i);
     const timeMatch = raw.match(
       /(\d{1,2}:\d{2})\s*(?:-|–|to)\s*(\d{1,2}:\d{2})/i,
     );
@@ -43,7 +70,7 @@ const Schedule_Teacher = () => {
       const dayTokens = dayMatch[0]
         .toUpperCase()
         .replace(/\s+/g, "")
-        .split(/[,\-]/)
+        .split(/[,-]/)
         .filter(Boolean);
       for (const t of dayTokens) {
         if (t === "CN" || /^T[2-7]$/.test(t)) days.push(t);
@@ -55,54 +82,98 @@ const Schedule_Teacher = () => {
     return { days, start, end };
   };
 
-  const dayTokenToDow = (token) => {
+  const getVisibleRange = (dateMoment, view) => {
+    const base = moment(dateMoment);
+    if (view === "month") {
+      const start = base.clone().startOf("month").startOf("week");
+      const end = base.clone().endOf("month").endOf("week");
+      return { start, end };
+    }
+    if (view === "day") {
+      const start = base.clone().startOf("day");
+      const end = base.clone().endOf("day");
+      return { start, end };
+    }
+    if (view === "agenda") {
+      const start = base.clone().startOf("week");
+      const end = base.clone().endOf("week");
+      return { start, end };
+    }
+    // default: week
+    const start = base.clone().startOf("week");
+    const end = base.clone().endOf("week");
+    return { start, end };
+  };
+
+  const dowToDayToken = (dow) => {
     // Moment: Sunday=0
-    if (token === "CN") return 0;
-    if (token === "T2") return 1;
-    if (token === "T3") return 2;
-    if (token === "T4") return 3;
-    if (token === "T5") return 4;
-    if (token === "T6") return 5;
-    if (token === "T7") return 6;
+    if (dow === 0) return "CN";
+    if (dow >= 1 && dow <= 6) return `T${dow + 1}`;
     return null;
   };
 
-  const buildEventsForWeek = (classList) => {
-    const weekStart = moment().startOf("week").add(1, "day"); // Monday
-    // if locale week starts on Monday already, this still yields Monday.
-    const weekStartSunday = moment().startOf("week");
+  const normalizeTime = (t) => {
+    if (!t) return null;
+    const raw = String(t).trim();
+    if (!raw) return null;
+    const [h, m] = raw.split(":").map((x) => Number(x));
+    if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
+    const hh = String(h).padStart(2, "0");
+    const mm = String(m).padStart(2, "0");
+    return `${hh}:${mm}`;
+  };
 
-    const evts = [];
-    for (const c of classList) {
+  const buildEventsForRange = (classList, rangeStart, rangeEnd) => {
+    const start = moment(rangeStart).startOf("day");
+    const end = moment(rangeEnd).endOf("day");
+    if (!start.isValid() || !end.isValid() || end.isBefore(start)) return [];
+
+    const classSchedules = (classList || []).map((c) => {
+      const parsed = parseScheduleRule(c.schedule_rule);
       const days = c.schedule_days?.length
         ? c.schedule_days
-        : parseScheduleRule(c.schedule_rule)?.days || [];
-      const startTime =
-        c.start_time || parseScheduleRule(c.schedule_rule)?.start;
-      const endTime = c.end_time || parseScheduleRule(c.schedule_rule)?.end;
-      if (!days.length || !startTime || !endTime) continue;
+        : parsed?.days || [];
+      const startTime = normalizeTime(c.start_time || parsed?.start);
+      const endTime = normalizeTime(c.end_time || parsed?.end);
+      return { c, days, startTime, endTime };
+    });
 
-      for (const d of days) {
-        const dow = dayTokenToDow(d);
-        if (dow == null) continue;
+    const evts = [];
+    const cursor = start.clone();
+    while (cursor.isSameOrBefore(end, "day")) {
+      const token = dowToDayToken(cursor.day());
+      if (token) {
+        for (const item of classSchedules) {
+          if (!item.days?.includes(token) || !item.startTime || !item.endTime)
+            continue;
 
-        const base =
-          dow === 0
-            ? weekStartSunday.clone()
-            : weekStart.clone().add(dow - 1, "day");
+          const [sh, sm] = item.startTime.split(":").map(Number);
+          const [eh, em] = item.endTime.split(":").map(Number);
+          const startAt = cursor
+            .clone()
+            .hour(sh)
+            .minute(sm)
+            .second(0)
+            .millisecond(0);
+          const endAt = cursor
+            .clone()
+            .hour(eh)
+            .minute(em)
+            .second(0)
+            .millisecond(0);
 
-        const [sh, sm] = String(startTime).split(":").map(Number);
-        const [eh, em] = String(endTime).split(":").map(Number);
-        const start = base.clone().hour(sh).minute(sm).second(0).millisecond(0);
-        const end = base.clone().hour(eh).minute(em).second(0).millisecond(0);
+          if (!endAt.isAfter(startAt)) continue;
 
-        evts.push({
-          title: `${c.name}${c.teacher_id?.full_name ? ` - ${c.teacher_id.full_name}` : ""}`,
-          start: start.toDate(),
-          end: end.toDate(),
-          resource: c,
-        });
+          const c = item.c;
+          evts.push({
+            title: `${c.name}${c.teacher_id?.full_name ? ` - ${c.teacher_id.full_name}` : ""}`,
+            start: startAt.toDate(),
+            end: endAt.toDate(),
+            resource: c,
+          });
+        }
       }
+      cursor.add(1, "day");
     }
     return evts;
   };
@@ -112,14 +183,11 @@ const Schedule_Teacher = () => {
       if (user?.role === "Teacher") {
         const { data } = await axios.get("/api/classes/my");
         setClasses(data);
-        setEvents(buildEventsForWeek(data));
       } else if (user?.role === "Student") {
         const { data } = await axios.get("/api/classes/student/my");
         setClasses(data);
-        setEvents(buildEventsForWeek(data));
       } else {
         setClasses([]);
-        setEvents([]);
       }
     } catch (error) {
       message.error(error.response?.data?.message || "Lỗi tải lịch");
@@ -130,6 +198,12 @@ const Schedule_Teacher = () => {
     fetchClasses();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.role]);
+
+  useEffect(() => {
+    const { start, end } = getVisibleRange(calendarDate, calendarView);
+    setEvents(buildEventsForRange(classes, start, end));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [classes, calendarDate?.valueOf(), calendarView]);
 
   const attendanceColumns = useMemo(() => {
     return [
@@ -312,6 +386,26 @@ const Schedule_Teacher = () => {
         events={events}
         startAccessor="start"
         endAccessor="end"
+        culture="vi"
+        formats={calendarFormats}
+        date={calendarDate.toDate()}
+        view={calendarView}
+        onNavigate={(date) => setCalendarDate(moment(date))}
+        onView={(v) => setCalendarView(v)}
+        messages={{
+          today: "Hôm nay",
+          previous: "Trước",
+          next: "Sau",
+          month: "Tháng",
+          week: "Tuần",
+          day: "Ngày",
+          agenda: "Danh sách",
+          date: "Ngày",
+          time: "Giờ",
+          event: "Lớp",
+          noEventsInRange: "Không có lịch trong khoảng này",
+          showMore: (total) => `+${total} thêm`,
+        }}
         style={{ height: "100%", marginTop: "20px" }}
         onSelectEvent={(evt) => {
           if (user?.role === "Teacher") {

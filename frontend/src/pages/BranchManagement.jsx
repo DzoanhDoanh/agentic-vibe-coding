@@ -106,6 +106,7 @@ const BranchManagement = () => {
       setAccountModalOpen(false);
       setAccountBranch(null);
       accountForm.resetFields();
+      fetchBranches();
     } catch (error) {
       message.error(error.response?.data?.message || "Lỗi tạo tài khoản");
     }
@@ -139,6 +140,22 @@ const BranchManagement = () => {
       ),
     },
     {
+      title: "Tài khoản chủ chi nhánh",
+      key: "branch_admin",
+      render: (_, record) => {
+        const admin = record.branch_admin;
+        if (!admin) return <Tag>Chưa có</Tag>;
+        return (
+          <div>
+            <div style={{ fontWeight: 600 }}>
+              {admin.full_name || "Branch Admin"}
+            </div>
+            <div style={{ color: "#666" }}>{admin.email}</div>
+          </div>
+        );
+      },
+    },
+    {
       title: "Hành động",
       key: "action",
       render: (_, record) => (
@@ -151,8 +168,12 @@ const BranchManagement = () => {
           >
             Sửa
           </Button>
-          <Button size="small" onClick={() => openCreateBranchAdmin(record)}>
-            Tạo Branch Admin
+          <Button
+            size="small"
+            disabled={!!record.branch_admin}
+            onClick={() => openCreateBranchAdmin(record)}
+          >
+            {record.branch_admin ? "Đã có Branch Admin" : "Tạo Branch Admin"}
           </Button>
           <Popconfirm
             title="Xóa chi nhánh?"

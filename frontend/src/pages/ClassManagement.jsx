@@ -40,7 +40,8 @@ const ClassManagement = () => {
   const fetchClasses = async () => {
     setLoading(true);
     try {
-      const { data } = await axios.get("/api/classes");
+      const url = user?.role === "Teacher" ? "/api/classes/my" : "/api/classes";
+      const { data } = await axios.get(url);
       setClasses(data);
     } catch (error) {
       if (error.response?.status !== 403) message.error("Lỗi tải dữ liệu lớp");
@@ -55,7 +56,7 @@ const ClassManagement = () => {
         params: { role: "Teacher" },
       });
       setTeachers(data);
-    } catch (error) {
+    } catch {
       // ignore
     }
   };
@@ -64,7 +65,7 @@ const ClassManagement = () => {
     try {
       const { data } = await axios.get("/api/students");
       setStudents(data);
-    } catch (error) {
+    } catch {
       // ignore
     }
   };
@@ -73,7 +74,8 @@ const ClassManagement = () => {
     fetchClasses();
     fetchTeachers();
     fetchStudents();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.role]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -98,7 +100,10 @@ const ClassManagement = () => {
       teacher_id: record.teacher_id?._id || record.teacher_id || undefined,
       status: record.status,
       days: record.schedule_days || [],
-      timeRange: record.start_time && record.end_time ? [dayjs(record.start_time, "HH:mm"), dayjs(record.end_time, "HH:mm")] : null
+      timeRange:
+        record.start_time && record.end_time
+          ? [dayjs(record.start_time, "HH:mm"), dayjs(record.end_time, "HH:mm")]
+          : null,
     });
     setIsModalVisible(true);
   };
@@ -184,34 +189,53 @@ const ClassManagement = () => {
         return <span>{n}</span>;
       },
     },
-    { title: "Trạng thái", dataIndex: "status", key: "status", render: (v) => v === "Open" ? <Tag color="green">Đang mở</Tag> : v === "Closed" ? <Tag color="red">Đã đóng</Tag> : v },
-    ...(user?.role !== "Teacher" ? [{
-      title: "Hành động",
-      key: "action",
-      render: (_, record) => (
-        <Space>
-          <Button
-            icon={<UserAddOutlined />}
-            size="small"
-            onClick={() => openEnroll(record)}
-          >
-            Ghi danh
-          </Button>
-          <Button
-            icon={<EditOutlined />}
-            size="small"
-            onClick={() => openEdit(record)}
-          >
-            Sửa
-          </Button>
-          <Popconfirm title="Xóa lớp?" onConfirm={() => handleDelete(record)}>
-            <Button icon={<DeleteOutlined />} danger size="small">
-              Xóa
-            </Button>
-          </Popconfirm>
-        </Space>
-      ),
-    }] : []),
+    {
+      title: "Trạng thái",
+      dataIndex: "status",
+      key: "status",
+      render: (v) =>
+        v === "Open" ? (
+          <Tag color="green">Đang mở</Tag>
+        ) : v === "Closed" ? (
+          <Tag color="red">Đã đóng</Tag>
+        ) : (
+          v
+        ),
+    },
+    ...(user?.role !== "Teacher"
+      ? [
+          {
+            title: "Hành động",
+            key: "action",
+            render: (_, record) => (
+              <Space>
+                <Button
+                  icon={<UserAddOutlined />}
+                  size="small"
+                  onClick={() => openEnroll(record)}
+                >
+                  Ghi danh
+                </Button>
+                <Button
+                  icon={<EditOutlined />}
+                  size="small"
+                  onClick={() => openEdit(record)}
+                >
+                  Sửa
+                </Button>
+                <Popconfirm
+                  title="Xóa lớp?"
+                  onConfirm={() => handleDelete(record)}
+                >
+                  <Button icon={<DeleteOutlined />} danger size="small">
+                    Xóa
+                  </Button>
+                </Popconfirm>
+              </Space>
+            ),
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -276,7 +300,11 @@ const ClassManagement = () => {
               placeholder="Chọn giáo viên"
             />
           </Form.Item>
-          <Form.Item name="days" label="Các ngày học trong tuần" rules={[{ required: true, message: "Chọn ít nhất 1 ngày" }]}>
+          <Form.Item
+            name="days"
+            label="Các ngày học trong tuần"
+            rules={[{ required: true, message: "Chọn ít nhất 1 ngày" }]}
+          >
             <Select mode="multiple" placeholder="Chọn ngày" size="large">
               <Select.Option value="T2">Thứ 2</Select.Option>
               <Select.Option value="T3">Thứ 3</Select.Option>
@@ -287,8 +315,16 @@ const ClassManagement = () => {
               <Select.Option value="CN">Chủ Nhật</Select.Option>
             </Select>
           </Form.Item>
-          <Form.Item name="timeRange" label="Khung giờ học" rules={[{ required: true, message: "Chọn khung giờ" }]}>
-            <TimePicker.RangePicker format="HH:mm" size="large" style={{ width: "100%" }} />
+          <Form.Item
+            name="timeRange"
+            label="Khung giờ học"
+            rules={[{ required: true, message: "Chọn khung giờ" }]}
+          >
+            <TimePicker.RangePicker
+              format="HH:mm"
+              size="large"
+              style={{ width: "100%" }}
+            />
           </Form.Item>
           <Form.Item name="status" label="Trạng thái" initialValue="Open">
             <Select

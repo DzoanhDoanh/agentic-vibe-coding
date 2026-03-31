@@ -8,8 +8,29 @@ const User = require("../models/User");
 // @access  Private/SuperAdmin
 const getBranches = async (req, res) => {
   try {
-    const branches = await Branch.find({});
-    res.json(branches);
+    const branches = await Branch.find({}).lean();
+
+    const branchIds = branches.map((b) => b._id);
+    const branchAdmins = await User.find({
+      role: "BranchAdmin",
+      branch_id: { $in: branchIds },
+    })
+      .select("_id email full_name status branch_id")
+      .sort({ createdAt: 1 })
+      .lean();
+
+    const adminByBranchId = new Map();
+    for (const admin of branchAdmins) {
+      const key = String(admin.branch_id);
+      if (!adminByBranchId.has(key)) adminByBranchId.set(key, admin);
+    }
+
+    res.json(
+      branches.map((b) => ({
+        ...b,
+        branch_admin: adminByBranchId.get(String(b._id)) || null,
+      })),
+    );
   } catch (error) {
     res.status(500).json({ message: "Server Error" });
   }
