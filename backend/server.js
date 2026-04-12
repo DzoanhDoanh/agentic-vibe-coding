@@ -18,6 +18,8 @@ const studentRoutes = require("./routes/studentRoutes");
 const userRoutes = require("./routes/userRoutes");
 const dashboardRoutes = require("./routes/dashboardRoutes");
 const attendanceRoutes = require("./routes/attendanceRoutes");
+const settingsRoutes = require("./routes/settingsRoutes");
+const invoiceRoutes = require("./routes/invoiceRoutes");
 
 app.use("/api/auth", authRoutes);
 app.use("/api/branches", branchRoutes);
@@ -26,6 +28,8 @@ app.use("/api/students", studentRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/attendance", attendanceRoutes);
+app.use("/api/settings", settingsRoutes);
+app.use("/api/invoices", invoiceRoutes);
 
 // Basic Route
 app.get("/api", (req, res) => {

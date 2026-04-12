@@ -20,8 +20,6 @@ const attendanceSchema = new mongoose.Schema(
       required: true,
     },
     remarks: { type: String },
-    // Optional: quick score entry for session/test
-    score: { type: Number, default: null },
   },
   { timestamps: true },
 );

@@ -127,7 +127,7 @@ const TeacherManagement = () => {
       key: "status",
       render: (v) => (
         <Tag color={v === "Active" ? "green" : "red"}>
-          {v === "Active" ? "Active" : "Inactive"}
+          {v === "Active" ? "Hoạt động" : "Vô hiệu"}
         </Tag>
       ),
     },
@@ -241,8 +241,8 @@ const TeacherManagement = () => {
             <Select
               size="large"
               options={[
-                { label: "Active", value: "Active" },
-                { label: "Inactive", value: "Inactive" },
+                { label: "Hoạt động", value: "Active" },
+                { label: "Vô hiệu", value: "Inactive" },
               ]}
             />
           </Form.Item>

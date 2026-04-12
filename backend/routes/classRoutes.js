@@ -17,29 +17,30 @@ const {
 router
   .route("/")
   .get(protect, isolateBranch, getClasses)
-  .post(protect, authorize("BranchAdmin"), isolateBranch, createClass);
+  .post(protect, authorize("BranchAdmin", "SuperAdmin"), isolateBranch, createClass);
 
 router.get("/my", protect, authorize("Teacher"), getMyClasses);
 router.get("/student/my", protect, authorize("Student"), getMyStudentClasses);
 
 router
   .route("/:id")
-  .put(protect, authorize("BranchAdmin"), isolateBranch, updateClass)
-  .delete(protect, authorize("BranchAdmin"), isolateBranch, deleteClass);
+  .put(protect, authorize("BranchAdmin", "SuperAdmin"), isolateBranch, updateClass)
+  .delete(protect, authorize("BranchAdmin", "SuperAdmin"), isolateBranch, deleteClass);
 
 router.post(
   "/:id/enroll",
   protect,
-  authorize("BranchAdmin"),
+  authorize("BranchAdmin", "SuperAdmin"),
   isolateBranch,
   enrollStudent,
 );
 router.post(
   "/:id/unenroll",
   protect,
-  authorize("BranchAdmin"),
+  authorize("BranchAdmin", "SuperAdmin"),
   isolateBranch,
   unenrollStudent,
 );
 
 module.exports = router;
+

@@ -47,7 +47,7 @@ const getAttendanceByClassAndDate = async (req, res) => {
 };
 
 // POST /api/attendance/class/:classId
-// body: { date: 'YYYY-MM-DD', records: [{ student_id, status, remarks, score }] }
+// body: { date: 'YYYY-MM-DD', records: [{ student_id, status, remarks }] }
 const upsertAttendance = async (req, res) => {
   try {
     const { classId } = req.params;
@@ -89,7 +89,6 @@ const upsertAttendance = async (req, res) => {
             date,
             status: r.status,
             remarks: r.remarks || "",
-            score: r.score ?? null,
           },
           { upsert: true, new: true, setDefaultsOnInsert: true },
         );
@@ -127,8 +126,45 @@ const getMyAttendance = async (req, res) => {
   }
 };
 
+const getPayroll = async (req, res) => {
+  try {
+    if (req.user.role !== "SuperAdmin" && req.user.role !== "BranchAdmin") {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    
+    // Get all attendances in branch (we need to join with Class to ensure branch match)
+    // For simplicity, we just fetch all classes in branch and then their attendances
+    const classes = await Class.find(req.branchFilter);
+    const classIds = classes.map(c => c._id);
+    
+    const attendances = await Attendance.find({ class_id: { $in: classIds } });
+    
+    // Group by teacher and count unique (class_id + date) sessions
+    const sessions = new Set();
+    const teacherSessions = {}; // teacher_id -> count
+    
+    attendances.forEach(att => {
+      const classObj = classes.find(c => String(c._id) === String(att.class_id));
+      if (!classObj || !classObj.teacher_id) return;
+      
+      const teacherId = String(classObj.teacher_id);
+      const sessionKey = `${classObj._id}_${normalizeDateOnly(att.date).getTime()}`;
+      
+      if (!sessions.has(sessionKey)) {
+        sessions.add(sessionKey);
+        teacherSessions[teacherId] = (teacherSessions[teacherId] || 0) + 1;
+      }
+    });
+
+    res.json(teacherSessions);
+  } catch (error) {
+    res.status(500).json({ message: "Server Error" });
+  }
+};
+
 module.exports = {
   getAttendanceByClassAndDate,
   upsertAttendance,
   getMyAttendance,
+  getPayroll,
 };

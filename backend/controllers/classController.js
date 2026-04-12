@@ -1,6 +1,8 @@
 const Class = require("../models/Class");
 const Student = require("../models/Student");
 const User = require("../models/User");
+const Invoice = require("../models/Invoice");
+const Course = require("../models/Course");
 
 const parseScheduleRule = (scheduleRule) => {
   if (!scheduleRule) return null;
@@ -342,6 +344,20 @@ const enrollStudent = async (req, res) => {
         student._id,
       ];
       await clazz.save();
+
+      let amount = 0;
+      if (clazz.course_id) {
+         const course = await Course.findById(clazz.course_id);
+         if (course) amount = course.price;
+      }
+      
+      await Invoice.create({
+         student_id: student._id,
+         class_id: clazz._id,
+         branch_id: clazz.branch_id,
+         amount: amount,
+         status: "Unpaid"
+      });
     }
 
     res.json(clazz);

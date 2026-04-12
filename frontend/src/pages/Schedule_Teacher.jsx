@@ -6,7 +6,6 @@ import "react-big-calendar/lib/css/react-big-calendar.css";
 import {
   DatePicker,
   Input,
-  InputNumber,
   Modal,
   Select,
   Space,
@@ -241,40 +240,12 @@ const Schedule_Teacher = () => {
         },
       },
       {
-        title: "Điểm",
-        key: "score",
-        render: (_, record) => {
-          const row = attendanceMap[record._id] || {
-            status: "Present",
-            remarks: "",
-            score: null,
-          };
-          return (
-            <InputNumber
-              value={row.score}
-              onChange={(value) =>
-                setAttendanceMap((prev) => ({
-                  ...prev,
-                  [record._id]: { ...row, score: value },
-                }))
-              }
-              min={0}
-              max={10}
-              step={0.25}
-              style={{ width: 120 }}
-              placeholder="-"
-            />
-          );
-        },
-      },
-      {
         title: "Ghi chú",
         key: "remarks",
         render: (_, record) => {
           const row = attendanceMap[record._id] || {
             status: "Present",
             remarks: "",
-            score: null,
           };
           return (
             <Input
@@ -310,14 +281,13 @@ const Schedule_Teacher = () => {
 
       const initial = {};
       for (const s of clazz.enrolled_students || []) {
-        initial[s._id] = { status: "Present", remarks: "", score: null };
+        initial[s._id] = { status: "Present", remarks: "" };
       }
       for (const r of data || []) {
         if (r.student_id?._id) {
           initial[r.student_id._id] = {
             status: r.status,
             remarks: r.remarks || "",
-            score: r.score ?? null,
           };
         }
       }
@@ -344,7 +314,6 @@ const Schedule_Teacher = () => {
         student_id: studentId,
         status: v.status,
         remarks: v.remarks,
-        score: v.score ?? null,
       }));
       await axios.post(`/api/attendance/class/${selectedClass._id}`, {
         date,

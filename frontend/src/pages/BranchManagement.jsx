@@ -189,15 +189,9 @@ const BranchManagement = () => {
   ];
 
   return (
-    <div>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          marginBottom: 16,
-        }}
-      >
-        <h2>Danh sách Cơ sở (Chi nhánh)</h2>
+    <div className="font-sans">
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold text-gray-800 m-0">Quản lý Chi nhánh</h2>
         <Space>
           <Input.Search
             placeholder="Tìm theo tên/địa chỉ"

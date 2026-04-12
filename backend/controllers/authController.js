@@ -45,4 +45,24 @@ const login = async (req, res) => {
   }
 };
 
-module.exports = { login };
+const changePassword = async (req, res) => {
+  try {
+    const { oldPassword, newPassword } = req.body;
+    if (!oldPassword || !newPassword) return res.status(400).json({ message: "Vui lòng nhập đủ mật khẩu" });
+    
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const isMatch = await bcrypt.compare(oldPassword, user.password_hash);
+    if (!isMatch) return res.status(400).json({ message: "Mật khẩu cũ không chính xác" });
+
+    user.password_hash = await bcrypt.hash(newPassword, 10);
+    await user.save();
+
+    res.json({ message: "Đổi mật khẩu thành công" });
+  } catch (error) {
+    res.status(500).json({ message: "Server Error" });
+  }
+};
+
+module.exports = { login, changePassword };

@@ -6,6 +6,7 @@ import {
   Navigate,
 } from "react-router-dom";
 import { AuthProvider, AuthContext } from "./context/AuthContext";
+import { ConfigProvider } from "antd";
 import AdminLayout from "./components/layout/AdminLayout";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
@@ -14,7 +15,10 @@ import ClassManagement from "./pages/ClassManagement";
 import StudentManagement from "./pages/StudentManagement";
 import Schedule_Teacher from "./pages/Schedule_Teacher";
 import TeacherManagement from "./pages/TeacherManagement";
-import StudentResults from "./pages/StudentResults";
+import TuitionManagement from "./pages/TuitionManagement";
+import PayrollReport from "./pages/PayrollReport";
+import UserManagement from "./pages/UserManagement";
+import AdminSettings from "./pages/AdminSettings";
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useContext(AuthContext);
@@ -42,7 +46,12 @@ const MainApp = () => {
           <Route path="classes" element={<ClassManagement />} />
           <Route path="students" element={<StudentManagement />} />
           <Route path="schedule" element={<Schedule_Teacher />} />
-          <Route path="results" element={<StudentResults />} />
+          <Route path="courses" element={<Navigate to="/settings" replace />} />
+          <Route path="rooms" element={<Navigate to="/settings" replace />} />
+          <Route path="tuitions" element={<TuitionManagement />} />
+          <Route path="payroll" element={<PayrollReport />} />
+          <Route path="users" element={<UserManagement />} />
+          <Route path="settings" element={<AdminSettings />} />
         </Route>
       </Routes>
     </Router>
@@ -51,9 +60,19 @@ const MainApp = () => {
 
 function App() {
   return (
-    <AuthProvider>
-      <MainApp />
-    </AuthProvider>
+    <ConfigProvider
+      theme={{
+        token: {
+          colorPrimary: '#3b82f6', // Tailwind blue-500
+          borderRadius: 8,
+          fontFamily: "'Inter', system-ui, sans-serif",
+        },
+      }}
+    >
+      <AuthProvider>
+        <MainApp />
+      </AuthProvider>
+    </ConfigProvider>
   );
 }
 

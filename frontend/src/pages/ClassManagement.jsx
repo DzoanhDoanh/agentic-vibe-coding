@@ -195,9 +195,9 @@ const ClassManagement = () => {
       key: "status",
       render: (v) =>
         v === "Open" ? (
-          <Tag color="green">Đang mở</Tag>
+          <Tag color="green">Mở</Tag>
         ) : v === "Closed" ? (
-          <Tag color="red">Đã đóng</Tag>
+          <Tag color="red">Đóng</Tag>
         ) : (
           v
         ),
@@ -239,15 +239,9 @@ const ClassManagement = () => {
   ];
 
   return (
-    <div>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          marginBottom: 16,
-        }}
-      >
-        <h2>Quản lý Lớp học</h2>
+    <div className="font-sans">
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold text-gray-800 m-0">Quản lý Lớp học</h2>
         <Space>
           <Input.Search
             placeholder="Tìm theo tên lớp"
@@ -330,8 +324,8 @@ const ClassManagement = () => {
             <Select
               size="large"
               options={[
-                { label: "Đang mở", value: "Open" },
-                { label: "Đã đóng", value: "Closed" },
+                { label: "Mở", value: "Open" },
+                { label: "Đóng", value: "Closed" },
               ]}
             />
           </Form.Item>
